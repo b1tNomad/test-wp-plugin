@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Post Activity
  * Description: A lightweight plugin designed to track administrative actions and post engagement. It provides real-time monitoring of content changes and detailed view statistics directly in dashboard.
- * Version: 0.0.1
+ * Version: 0.0.2
  * Author: Roman Lernichenko
  * Text Domain: wp-post-activity
  */
