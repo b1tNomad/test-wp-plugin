@@ -7,22 +7,38 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class Post_Activity_Init {
+	private static array $processed_posts = [];
+
 	public function init(): void {
-		add_action('save_post', [$this, 'handle_save_post'], 10, 3);
+		add_action( 'transition_post_status', [ $this, 'handle_status_transition' ], 10, 3 );
 
 		add_action('before_delete_post', [$this, 'handle_delete_post']);
 
 		add_action('template_redirect', [$this, 'track_post_views']);
 	}
 
+	public function handle_status_transition( $new_status, $old_status, $post ): void {
+		$postId = $post->ID;
 
-	public function handle_save_post( $postId, $post, $update ): void {
+		if ( wp_is_post_revision( $postId ) ||
+		     $new_status === 'auto-draft' ||
+		     $new_status === 'inherit' ) return;
 
-		if ( ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) ||
-		     wp_is_post_revision( $postId ) || $post->post_status === 'inherit' ) return;
+		if ( isset( self::$processed_posts[ $postId ] ) ) return;
 
-		$action = $update ? 'updated' : 'created';
-		$this->insert_activity_log( $postId, $action );
+		$action = match ( true ) {
+			( $old_status === 'new' || $old_status === 'auto-draft' ) && $new_status === 'draft' => 'created',
+			$old_status !== 'publish' && $new_status === 'publish' => 'published',
+			$new_status === 'trash' => 'trashed',
+			$old_status === 'trash' && $new_status !== 'trash' => 'restored',
+			$old_status === $new_status && ! in_array( $new_status, [ 'auto-draft', 'new' ] ) => 'updated',
+			default => '',
+		};
+
+		if ( $action ) {
+			self::$processed_posts[ $postId ] = $action;
+			$this->insert_activity_log( $postId, $action );
+		}
 	}
 
 	public function handle_delete_post( $postId ): void {
